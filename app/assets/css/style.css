@@ -55,7 +55,7 @@ body {
 
 /* ===== HEADER ===== */
 header {
-  background: rgba(30, 50, 88, 0.85);
+  background: var(--bg2);
   backdrop-filter: blur(12px);
   padding: 13px 32px;
   display: flex;
