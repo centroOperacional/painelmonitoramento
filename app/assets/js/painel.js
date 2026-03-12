@@ -34,13 +34,6 @@ async function init() {
   const nome  = sessionStorage.getItem('fb_nome') || session.user.email;
   document.getElementById('usuario-nome').textContent = `${nome} · ${role}`;
 
-  // RBAC: Oculta botão de Gestão para perfil usuario
-  // admin e admin_master têm acesso à Gestão
-  if (role === 'usuario') {
-    const btnGestao = document.getElementById('nav-gestao');
-    if (btnGestao) btnGestao.style.display = 'none';
-  }
-  
   if (typeof iniciarMonitorInatividade === 'function') iniciarMonitorInatividade();
 
   await carregarTickets();
