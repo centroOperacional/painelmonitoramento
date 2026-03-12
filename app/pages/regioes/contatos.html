@@ -268,12 +268,6 @@
       const role = ctx.perfil.role;
       podeEditar = (role === 'admin_master' || role === 'admin');
 
-      // RBAC: Oculta Gestão para usuario
-      if (role === 'usuario') {
-        const btn = document.getElementById('nav-gestao');
-        if (btn) btn.style.display = 'none';
-      }
-
       if (podeEditar) {
         document.getElementById('th-acoes').style.display = '';
         document.getElementById('add-contato-row').classList.remove('hidden');
