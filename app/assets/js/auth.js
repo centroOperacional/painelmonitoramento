@@ -258,12 +258,22 @@ async function iniciarPaginaLogin() {
       });
 
       if (error || !data?.user?.id) {
+        console.error("Erro no login:", error);
+        let msgPersonalizada = "Erro bruto: " + (error?.message || "Desconhecido");
+        if (error && error.message) {
+          if (error.message.includes("Email not confirmed")) {
+            msgPersonalizada = "E-mail não confirmado. Verifique sua caixa de entrada.";
+          } else if (error.message.includes("Invalid login credentials")) {
+            msgPersonalizada = "E-mail ou senha incorretos.";
+          }
+        }
+        
         tentativasFalhas++;
         const delaySegundos =
           tentativasFalhas >= 3 ? Math.min(tentativasFalhas * 5, 30) : 0;
 
         if (delaySegundos > 0) {
-          _msgErro(`E-mail ou senha incorretos. Aguarde ${delaySegundos}s para tentar novamente.`);
+          _msgErro(`${msgPersonalizada} Aguarde ${delaySegundos}s para tentar novamente.`);
 
           let restante = delaySegundos;
           const intervalo = setInterval(() => {
@@ -280,7 +290,7 @@ async function iniciarPaginaLogin() {
             }
           }, 1000);
         } else {
-          _msgErro("E-mail ou senha incorretos.");
+          _msgErro(msgPersonalizada);
           if (btn) {
             btn.disabled = false;
             btn.textContent = "Entrar";
