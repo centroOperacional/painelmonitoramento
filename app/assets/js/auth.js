@@ -130,6 +130,12 @@ async function guardPage(rolesPermitidas = []) {
   escreverNomeNoHeader(perfil, session);
   iniciarMonitorInatividade();
 
+  // RBAC: Oculta botão de Gestão para perfis sem acesso (usuario)
+  if (perfil.role === "usuario") {
+    const btnGestao = document.getElementById("nav-gestao");
+    if (btnGestao) btnGestao.style.display = "none";
+  }
+
   return { session, perfil };
 }
 

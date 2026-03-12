@@ -63,14 +63,7 @@
   <script src="../../assets/js/supabase-config.js"></script>
   <script src="../../assets/js/auth.js"></script>
   <script>
-    guardPage(["admin_master", "admin", "editor", "usuario"]).then(ctx => {
-      if (!ctx) return;
-      const role = ctx.perfil.role;
-      if (role === "usuario" || role === "editor") {
-        const btn = document.getElementById("nav-gestao");
-        if (btn) btn.style.display = "none";
-      }
-    });
+    guardPage(["admin_master", "admin", "usuario"]);
 
     function abrirModalSenha() {
       document.getElementById("modal-senha").classList.remove("hidden");
