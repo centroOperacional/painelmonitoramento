@@ -18,6 +18,27 @@
     .criar-actions { margin-top: 16px; }
     .gestao-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .gestao-hint { font-size: 0.8rem; color: var(--texto-dim); }
+    /* Telegram config */
+    .tg-card { background: var(--bg2); border: 1px solid var(--borda); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; max-width: 620px; }
+    .tg-card h3 { font-size: 0.95rem; color: var(--texto-dim); font-weight: 700; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px; }
+    .tg-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .tg-field label { font-size: 0.8rem; color: var(--texto-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .tg-field input { background: var(--bg); border: 1px solid var(--borda); color: var(--texto); padding: 8px 10px; border-radius: 6px; font-size: 0.88rem; font-family: monospace; }
+    .tg-field input:focus { border-color: var(--azul); outline: none; }
+    .tg-field .tg-input-row { display: flex; gap: 8px; align-items: center; }
+    .tg-field .tg-input-row input { flex: 1; }
+    .tg-field .tg-eye { background: none; border: 1px solid var(--borda); color: var(--texto-dim); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.9rem; transition: all 0.15s; }
+    .tg-field .tg-eye:hover { border-color: var(--azul-borda); color: var(--texto); }
+    .tg-info { background: var(--bg3); border: 1px solid var(--borda); border-radius: 8px; padding: 14px 18px; margin-bottom: 22px; max-width: 620px; }
+    .tg-info p { font-size: 0.85rem; color: var(--texto-dim); margin: 0 0 8px 0; line-height: 1.6; }
+    .tg-info p:last-child { margin-bottom: 0; }
+    .tg-info strong { color: var(--texto); }
+    .tg-grupos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 620px; }
+    @media (max-width: 600px) { .tg-grupos-grid { grid-template-columns: 1fr; } }
+    .tg-grupo-card { background: var(--bg2); border: 1px solid var(--borda); border-radius: 10px; padding: 16px 18px; }
+    .tg-grupo-card h4 { font-size: 0.82rem; color: var(--texto-dim); font-weight: 700; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.06em; }
+    .tg-actions { margin-top: 20px; max-width: 620px; display: flex; gap: 12px; align-items: center; }
+    .tg-lock-msg { font-size: 0.82rem; color: var(--texto-dim); font-style: italic; padding: 20px; text-align: center; }
   </style>
 
   <script>
@@ -36,6 +57,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="mudarAba('usuarios', event)">Usuários</button>
       <button class="tab-btn" onclick="mudarAba('logs', event)">Histórico de Gestão</button>
+      <button class="tab-btn" onclick="mudarAba('telegram', event)" id="tab-telegram" style="display:none;">Telegram</button>
     </div>
 
     <!-- ABA USUÁRIOS -->
@@ -85,6 +107,74 @@
       </div>
       <div id="log-wrapper"><div class="loading">Carregando histórico...</div></div>
     </div>
+
+    <!-- ABA TELEGRAM -->
+    <div id="secao-telegram" class="hidden">
+      <div class="tg-info">
+        <p>📡 <strong>Configuração do Bot do Telegram</strong></p>
+        <p>
+          Aqui você configura a integração com o Telegram. O sistema envia mensagens automáticas
+          (abertura de TTKs, solicitações de atualização e resumo diário) para os grupos de cada região.
+        </p>
+        <p>
+          <strong>Como funciona:</strong> Crie um bot no Telegram via <strong>@BotFather</strong>,
+          copie o token gerado e cole no campo abaixo. Depois, adicione o bot como membro em cada
+          grupo regional e insira o <strong>Chat ID</strong> do grupo correspondente.
+        </p>
+        <p>
+          💡 Para descobrir o Chat ID, adicione o bot ao grupo, envie uma mensagem e acesse:<br>
+          <code style="font-size:0.8rem;color:var(--azul-claro);">https://api.telegram.org/bot&lt;SEU_TOKEN&gt;/getUpdates</code>
+        </p>
+      </div>
+
+      <div class="tg-card">
+        <h3>🤖 Token do Bot</h3>
+        <div class="tg-field">
+          <label>TELEGRAM BOT TOKEN</label>
+          <div class="tg-input-row">
+            <input type="password" id="tg-bot-token" placeholder="123456:AABBcc..." maxlength="100">
+            <button class="tg-eye" onclick="toggleTokenVis()" title="Mostrar/Ocultar">👁</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="font-size:0.9rem;color:var(--texto-dim);font-weight:700;margin:0 0 14px 0;">📨 Chat IDs dos Grupos por Região</h3>
+      <div class="tg-grupos-grid">
+        <div class="tg-grupo-card">
+          <h4>🟢 Norte</h4>
+          <div class="tg-field">
+            <label>Chat ID</label>
+            <input type="text" id="tg-group-norte" placeholder="-1001234567890" maxlength="30">
+          </div>
+        </div>
+        <div class="tg-grupo-card">
+          <h4>🔵 Sul</h4>
+          <div class="tg-field">
+            <label>Chat ID</label>
+            <input type="text" id="tg-group-sul" placeholder="-1001234567890" maxlength="30">
+          </div>
+        </div>
+        <div class="tg-grupo-card">
+          <h4>🟠 Serra</h4>
+          <div class="tg-field">
+            <label>Chat ID</label>
+            <input type="text" id="tg-group-serra" placeholder="-1001234567890" maxlength="30">
+          </div>
+        </div>
+        <div class="tg-grupo-card">
+          <h4>🟣 Taquari</h4>
+          <div class="tg-field">
+            <label>Chat ID</label>
+            <input type="text" id="tg-group-taquari" placeholder="-1001234567890" maxlength="30">
+          </div>
+        </div>
+      </div>
+
+      <div class="tg-actions">
+        <button class="btn-primary" id="btn-salvar-telegram" onclick="salvarConfigTelegram()">💾 Salvar Configurações</button>
+        <span id="tg-status" style="font-size:0.8rem;color:var(--texto-dim);"></span>
+      </div>
+    </div>
   </main>
 
   <div id="alerta" class="alerta hidden"></div>
@@ -103,6 +193,11 @@
       meuId   = ctx.session.user.id;
       meuRole = ctx.perfil.role;
 
+      // Mostra aba Telegram apenas para admin_master
+      if (meuRole === "admin_master") {
+        document.getElementById("tab-telegram").style.display = "";
+      }
+
       carregarUsuarios();
     });
 
@@ -112,8 +207,73 @@
       if (event?.target) event.target.classList.add("active");
       document.getElementById("secao-usuarios").classList.toggle("hidden", aba !== "usuarios");
       document.getElementById("secao-logs").classList.toggle("hidden", aba !== "logs");
+      document.getElementById("secao-telegram").classList.toggle("hidden", aba !== "telegram");
       if (aba === "logs") carregarLogs();
       if (aba === "usuarios") carregarUsuarios();
+      if (aba === "telegram") carregarConfigTelegram();
+    }
+
+    // ── Telegram Config ──────────────────────────────────────
+    let tgConfigCarregada = false;
+
+    async function carregarConfigTelegram() {
+      if (tgConfigCarregada) return;
+      const { data, error } = await sb.from("telegram_config").select("chave,valor");
+      if (error) {
+        alerta("❌ Erro ao carregar configurações do Telegram: " + error.message, true);
+        return;
+      }
+      if (data) {
+        data.forEach(row => {
+          if (row.chave === "BOT_TOKEN") document.getElementById("tg-bot-token").value = row.valor;
+          if (row.chave === "GROUP_NORTE") document.getElementById("tg-group-norte").value = row.valor;
+          if (row.chave === "GROUP_SUL") document.getElementById("tg-group-sul").value = row.valor;
+          if (row.chave === "GROUP_SERRA") document.getElementById("tg-group-serra").value = row.valor;
+          if (row.chave === "GROUP_TAQUARI") document.getElementById("tg-group-taquari").value = row.valor;
+        });
+        tgConfigCarregada = true;
+        document.getElementById("tg-status").textContent = "Configurações carregadas.";
+        setTimeout(() => document.getElementById("tg-status").textContent = "", 3000);
+      }
+    }
+
+    async function salvarConfigTelegram() {
+      const btn = document.getElementById("btn-salvar-telegram");
+      btn.disabled = true; btn.textContent = "⏳ Salvando...";
+
+      const meuNome = sessionStorage.getItem("fb_nome") || "sistema";
+      const configs = [
+        { chave: "BOT_TOKEN",     valor: document.getElementById("tg-bot-token").value.trim() },
+        { chave: "GROUP_NORTE",   valor: document.getElementById("tg-group-norte").value.trim() },
+        { chave: "GROUP_SUL",     valor: document.getElementById("tg-group-sul").value.trim() },
+        { chave: "GROUP_SERRA",   valor: document.getElementById("tg-group-serra").value.trim() },
+        { chave: "GROUP_TAQUARI", valor: document.getElementById("tg-group-taquari").value.trim() },
+      ];
+
+      try {
+        for (const cfg of configs) {
+          const { error } = await sb.from("telegram_config")
+            .upsert({ chave: cfg.chave, valor: cfg.valor, atualizado_em: new Date().toISOString(), atualizado_por: meuNome }, { onConflict: "chave" });
+          if (error) throw new Error(`Erro ao salvar ${cfg.chave}: ${error.message}`);
+        }
+
+        await sb.from("logs").insert([{
+          acao: "GESTAO", ttk: "TELEGRAM",
+          detalhe: "Configurações do Telegram atualizadas",
+          usuario: meuNome
+        }]);
+
+        alerta("✅ Configurações do Telegram salvas com sucesso!");
+      } catch (e) {
+        alerta("❌ " + e.message, true);
+      } finally {
+        btn.disabled = false; btn.textContent = "💾 Salvar Configurações";
+      }
+    }
+
+    function toggleTokenVis() {
+      const input = document.getElementById("tg-bot-token");
+      input.type = input.type === "password" ? "text" : "password";
     }
 
     // ── Criar usuário ───────────────────────────────────────

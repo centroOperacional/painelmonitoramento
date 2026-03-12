@@ -3,20 +3,41 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 import { corsHeaders } from "../_shared/cors.ts";
 
-const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+// Lê configurações do Telegram do banco, com fallback para Secrets
+async function getTelegramConfig(supabaseAdmin: any): Promise<{ botToken: string; groups: Record<string, string> }> {
+  const { data } = await supabaseAdmin.from('telegram_config').select('chave,valor')
+
+  const config: Record<string, string> = {}
+  if (data) {
+    data.forEach((row: { chave: string; valor: string }) => {
+      config[row.chave] = row.valor
+    })
+  }
+
+  const botToken = config['BOT_TOKEN'] || Deno.env.get('TELEGRAM_BOT_TOKEN') || ''
+  const groups: Record<string, string> = {}
+  for (const regiao of ['NORTE', 'SUL', 'SERRA', 'TAQUARI']) {
+    groups[regiao] = config[`GROUP_${regiao}`] || Deno.env.get(`TELEGRAM_GROUP_${regiao}`) || ''
+  }
+
+  return { botToken, groups }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!TELEGRAM_BOT_TOKEN) {
-      throw new Error("TELEGRAM_BOT_TOKEN não configurado nos Secrets.");
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // Lê config do banco (ou fallback para Secrets)
+    const { botToken, groups } = await getTelegramConfig(supabaseAdmin)
+
+    if (!botToken) {
+      throw new Error("Token do Bot do Telegram não configurado. Configure na aba Telegram da Gestão ou nos Secrets.");
+    }
 
     // Busca tickets ativos
     const { data: tickets, error } = await supabaseAdmin
@@ -52,13 +73,13 @@ serve(async (req) => {
         mensagem = `🟡 <b>Bom dia!</b>\nSegue TTK's pendentes região <b>${grupo}</b>.\n\n${linhas}`;
       }
 
-      const chatId = Deno.env.get(`TELEGRAM_GROUP_${grupo.toUpperCase()}`);
+      const chatId = groups[grupo]
       if (!chatId) {
-        console.warn(`[resumo-diario] Grupo TELEGRAM_GROUP_${grupo.toUpperCase()} não configurado nos Secrets.`);
+        console.warn(`[resumo-diario] Grupo ${grupo} não configurado na tabela telegram_config nem nos Secrets.`);
         continue;
       }
 
-      const resTelegram = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      const resTelegram = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -3,10 +3,35 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
 
 import { corsHeaders } from "../_shared/cors.ts"
 
-const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
-if (!BOT_TOKEN) console.error('[CRITICAL] TELEGRAM_BOT_TOKEN não configurado nos Secrets.')
-
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+async function getSupabaseAdmin() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+}
+
+// Lê configurações do Telegram do banco, com fallback para Secrets
+async function getTelegramConfig(): Promise<{ botToken: string; groups: Record<string, string> }> {
+  const sbAdmin = await getSupabaseAdmin()
+  const { data } = await sbAdmin.from('telegram_config').select('chave,valor')
+
+  const config: Record<string, string> = {}
+  if (data) {
+    data.forEach((row: { chave: string; valor: string }) => {
+      config[row.chave] = row.valor
+    })
+  }
+
+  const botToken = config['BOT_TOKEN'] || Deno.env.get('TELEGRAM_BOT_TOKEN') || ''
+  const groups: Record<string, string> = {}
+  for (const regiao of ['NORTE', 'SUL', 'SERRA', 'TAQUARI']) {
+    groups[regiao] = config[`GROUP_${regiao}`] || Deno.env.get(`TELEGRAM_GROUP_${regiao}`) || ''
+  }
+
+  return { botToken, groups }
+}
 
 async function validarJWT(req: Request): Promise<boolean> {
   const authHeader = req.headers.get('Authorization')
@@ -37,8 +62,8 @@ function okResp(msg: string) {
 
 // ── Envio de texto ─────────────────────────────────────────────────────────
 
-async function enviarTexto(chatId: string, mensagem: string): Promise<void> {
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
+async function enviarTexto(botToken: string, chatId: string, mensagem: string): Promise<void> {
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,21 +76,18 @@ async function enviarTexto(chatId: string, mensagem: string): Promise<void> {
 }
 
 // ── Envio de fotos ─────────────────────────────────────────────────────────
-// Usa sendPhoto para 1 foto, sendMediaGroup para 2.
-// A legenda (caption) vai na primeira foto.
 
-async function enviarFotos(chatId: string, fotos: Uint8Array[], nomes: string[], caption: string): Promise<void> {
+async function enviarFotos(botToken: string, chatId: string, fotos: Uint8Array[], nomes: string[], caption: string): Promise<void> {
   if (fotos.length === 0) return
 
   if (fotos.length === 1) {
-    // ── 1 foto ──────────────────────────────────────────────
     const fd = new FormData()
     fd.append('chat_id', chatId)
-    fd.append('caption', caption.slice(0, 1024))   // limite Telegram
+    fd.append('caption', caption.slice(0, 1024))
     fd.append('parse_mode', 'HTML')
     fd.append('photo', new Blob([fotos[0]], { type: 'image/jpeg' }), nomes[0] || 'foto.jpg')
 
-    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
       method: 'POST',
       body: fd,
     })
@@ -91,7 +113,7 @@ async function enviarFotos(chatId: string, fotos: Uint8Array[], nomes: string[],
     fd.append(`foto${idx}`, new Blob([bytes], { type: 'image/jpeg' }), nomes[idx] || `foto${idx}.jpg`)
   })
 
-  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMediaGroup`, {
     method: 'POST',
     body: fd,
   })
@@ -107,11 +129,13 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    if (!BOT_TOKEN) throw new Error("Configuração do servidor incompleta: TELEGRAM_BOT_TOKEN ausente.")
-
     // Validar JWT antes de qualquer coisa
     const autorizado = await validarJWT(req)
     if (!autorizado) return erroResp("Acesso não autorizado.", 401)
+
+    // Lê config do banco (ou fallback para Secrets)
+    const { botToken, groups } = await getTelegramConfig()
+    if (!botToken) throw new Error("Token do Bot do Telegram não configurado. Configure na aba Telegram da Gestão.")
 
     const contentType = req.headers.get('content-type') ?? ''
     let mensagem = ''
@@ -120,12 +144,10 @@ serve(async (req) => {
     const fotoNomes: string[] = []
 
     if (contentType.includes('multipart/form-data')) {
-      // ── Payload com fotos (FormData) ────────────────────
       const form = await req.formData()
       mensagem = (form.get('mensagem') as string) ?? ''
       regiao   = (form.get('regiao')   as string) ?? ''
 
-      // Coleta até 2 fotos (campos foto0, foto1)
       for (let i = 0; i < 2; i++) {
         const entry = form.get(`foto${i}`)
         if (entry && entry instanceof File) {
@@ -135,7 +157,6 @@ serve(async (req) => {
         }
       }
     } else {
-      // ── Payload JSON (sem fotos) ─────────────────────────
       const body = await req.json()
       mensagem = body.mensagem ?? ''
       regiao   = body.regiao   ?? ''
@@ -145,18 +166,15 @@ serve(async (req) => {
       return erroResp("Os campos 'mensagem' e 'regiao' são obrigatórios.")
     }
 
-    const envVarName = `TELEGRAM_GROUP_${regiao.toUpperCase()}`
-    const chatId = Deno.env.get(envVarName)
-    
+    const chatId = groups[regiao.toUpperCase()]
     if (!chatId) {
-      return erroResp(`Região inválida ou grupo não configurado no Supabase Secrets (${envVarName}).`)
+      return erroResp(`Região inválida ou grupo não configurado (${regiao.toUpperCase()}). Configure na aba Telegram da Gestão.`)
     }
 
     if (fotoBytes.length > 0) {
-      // Envia texto primeiro (para aparecer antes das fotos no grupo)
-      await enviarFotos(chatId, fotoBytes, fotoNomes, mensagem)
+      await enviarFotos(botToken, chatId, fotoBytes, fotoNomes, mensagem)
     } else {
-      await enviarTexto(chatId, mensagem)
+      await enviarTexto(botToken, chatId, mensagem)
     }
 
     return okResp("Mensagem enviada ao Telegram.")
