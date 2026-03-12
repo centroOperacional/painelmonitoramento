@@ -1,0 +1,130 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+
+import { corsHeaders } from "../_shared/cors.ts"
+
+
+// 1. Função que gera o JWT para a Google API (Mantida a sua lógica original de Criptografia)
+async function getGoogleToken(credentials: any): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const payload = {
+    iss: credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  }
+
+  const encode = (obj: any) => btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const unsigned = `${encode(header)}.${encode(payload)}`
+
+  const pemKey = credentials.private_key
+  const pemBody = pemKey.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '')
+  const binaryKey = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    binaryKey,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(unsigned))
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+
+  const jwt = `${unsigned}.${sigB64}`
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  })
+
+  const tokenData = await tokenRes.json()
+  if (!tokenData.access_token) throw new Error('Falha ao obter token Google: ' + JSON.stringify(tokenData))
+  return tokenData.access_token
+}
+
+serve(async (req) => {
+  // Tratamento do CORS para requisições do Frontend
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    // 2. Validação de Segurança (O usuário está logado?)
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error("Acesso negado: Token de autenticação ausente.")
+    
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    )
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) throw new Error("Acesso negado: Usuário não autenticado.")
+
+    // 3. Extração e Validação do Payload
+    const { ttk, id_servico, cidade, tag, sla_pct, sla_horas, data_inicio, grupo_regiao } = await req.json()
+
+    if (!ttk || !grupo_regiao) {
+      throw new Error("Os campos 'ttk' e 'grupo_regiao' são obrigatórios.")
+    }
+
+    // 4. Carregamento das Credenciais do Google e ID da Planilha
+    const credentialsRaw = Deno.env.get('GOOGLE_SERVICE_ACCOUNT')
+    if (!credentialsRaw) throw new Error("A chave do Google (GOOGLE_SERVICE_ACCOUNT) não está configurada nos Secrets.")
+    
+    const SPREADSHEET_ID = Deno.env.get('GOOGLE_SPREADSHEET_ID')
+    if (!SPREADSHEET_ID) throw new Error("O ID da planilha (GOOGLE_SPREADSHEET_ID) não está configurado nos Secrets.")
+    
+    const credentials = JSON.parse(credentialsRaw)
+
+    // 5. Integração com Google Sheets
+    const googleToken = await getGoogleToken(credentials)
+    
+    const aba = grupo_regiao.toUpperCase()
+    const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    const dataInicio = data_inicio ? new Date(data_inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : ''
+
+    const valores = [[
+      ttk || '',
+      id_servico || '',
+      cidade || '',
+      tag || '',
+      sla_pct != null ? `${sla_pct}%` : '',
+      dataInicio,
+      agora,
+    ]]
+
+    const range = `${aba}!A:G`
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`
+
+    const sheetsRes = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${googleToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ values: valores }),
+    })
+
+    const sheetsData = await sheetsRes.json()
+    if (!sheetsRes.ok) throw new Error(sheetsData.error?.message || 'Erro ao gravar na planilha.')
+
+    // 6. Retorno de Sucesso
+    return new Response(JSON.stringify({ sucesso: true, aba, mensagem: "Ticket salvo nos encerrados." }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    })
+  }
+})

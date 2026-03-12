@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de acessos</title>
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <style>
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--borda); padding-bottom: 10px; }
+    .btn-disabled { opacity: 0.3; cursor: not-allowed !important; filter: grayscale(1); }
+    .criar-usuario-card { background: var(--bg2); border: 1px solid var(--borda); border-radius: 10px; padding: 20px 24px; margin-bottom: 28px; max-width: 560px; }
+    .criar-usuario-card h3 { font-size: 0.95rem; color: var(--texto-dim); font-weight: 700; margin: 0 0 16px 0; }
+    .criar-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .criar-field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+    .criar-field label { font-size: 0.8rem; color: var(--texto-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .criar-field input, .criar-field select { background: var(--bg); border: 1px solid var(--borda); color: var(--texto); padding: 8px 10px; border-radius: 6px; font-size: 0.88rem; }
+    .criar-field input:focus, .criar-field select:focus { border-color: var(--azul); outline: none; }
+    .criar-actions { margin-top: 16px; }
+    .gestao-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .gestao-hint { font-size: 0.8rem; color: var(--texto-dim); }
+  </style>
+
+  <script>
+    window.FB_TEMA_SEM_BOTAO = true;
+  </script>
+  
+  <script src="../../assets/js/temas.js"></script>
+</head>
+<body>
+  <header>
+    <h1>⚙️ GESTÃO DE ACESSOS</h1>
+    <nav><a href="../painel/painel.html" class="nav-btn">← Voltar ao Painel</a></nav>
+  </header>
+
+  <main class="container-wide">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="mudarAba('usuarios', event)">Usuários</button>
+      <button class="tab-btn" onclick="mudarAba('logs', event)">Histórico de Gestão</button>
+    </div>
+
+    <!-- ABA USUÁRIOS -->
+    <div id="secao-usuarios">
+      <div class="gestao-header-row">
+        <h2 style="font-size:1rem; color:var(--texto-dim); margin:0;">Controle de Acessos</h2>
+        <span class="gestao-hint">Admin Master: criado direto no banco. Admin: gerencia admins e usuários.</span>
+      </div>
+
+      <div class="criar-usuario-card">
+        <h3>➕ Criar novo usuário</h3>
+        <div class="criar-row">
+          <div class="criar-field">
+            <label>Nome</label>
+            <input type="text" id="novo-nome" placeholder="Nome completo" maxlength="80">
+          </div>
+          <div class="criar-field">
+            <label>E-mail</label>
+            <input type="email" id="novo-email" placeholder="email@exemplo.com">
+          </div>
+        </div>
+        <div class="criar-row">
+          <div class="criar-field">
+            <label>Senha Inicial</label>
+            <input type="password" id="novo-senha" placeholder="Mínimo 6, máximo 20 caracteres">
+          </div>
+          <div class="criar-field">
+            <label>Perfil</label>
+            <select id="novo-role">
+              <option value="usuario">Usuário</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="criar-actions">
+          <button class="btn-primary" id="btn-criar-usuario">Criar Usuário</button>
+        </div>
+      </div>
+
+      <div id="usuarios-wrapper"><div class="loading">Carregando usuários...</div></div>
+    </div>
+
+    <!-- ABA LOGS -->
+    <div id="secao-logs" class="hidden">
+      <div style="margin-bottom:16px;">
+        <h2 style="font-size:1rem; color:var(--texto-dim); margin:0;">Logs de Alterações Administrativas</h2>
+      </div>
+      <div id="log-wrapper"><div class="loading">Carregando histórico...</div></div>
+    </div>
+  </main>
+
+  <div id="alerta" class="alerta hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../../assets/js/supabase-config.js"></script>
+  <script src="../../assets/js/auth.js"></script>
+  <script>
+    const sb = getClient();
+    let meuId   = null;
+    let meuRole = null;
+
+    // Proteção de rota
+    guardPage(["admin_master", "admin"]).then(ctx => {
+      if (!ctx) return;
+      meuId   = ctx.session.user.id;
+      meuRole = ctx.perfil.role;
+
+      carregarUsuarios();
+    });
+
+    // ── Trocar aba ──────────────────────────────────────────
+    function mudarAba(aba, event) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      if (event?.target) event.target.classList.add("active");
+      document.getElementById("secao-usuarios").classList.toggle("hidden", aba !== "usuarios");
+      document.getElementById("secao-logs").classList.toggle("hidden", aba !== "logs");
+      if (aba === "logs") carregarLogs();
+      if (aba === "usuarios") carregarUsuarios();
+    }
+
+    // ── Criar usuário ───────────────────────────────────────
+    document.getElementById("btn-criar-usuario").addEventListener("click", async () => {
+      const nome  = document.getElementById("novo-nome").value.trim();
+      const email = document.getElementById("novo-email").value.trim();
+      const senha = document.getElementById("novo-senha").value;
+      const role  = document.getElementById("novo-role").value;
+
+      if (!nome || !email || !senha) return alerta("Preencha todos os campos.", true);
+      if (senha.length < 6) return alerta("A senha deve ter no mínimo 6 caracteres.", true);
+
+      const btn = document.getElementById("btn-criar-usuario");
+      btn.disabled = true; btn.textContent = "Criando...";
+
+      try {
+        const session = await getSession();
+        if (!session?.access_token) throw new Error("Sessão inválida. Faça login novamente.");
+
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+            "apikey": SUPABASE_KEY
+          },
+          body: JSON.stringify({ nome, email, password: senha, role })
+        });
+
+        const payload = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(payload?.error || "Erro ao criar usuário.");
+
+        const meuNome = sessionStorage.getItem("fb_nome") || "sistema";
+        await sb.from("logs").insert([{
+          acao: "GESTAO", ttk: "USUARIO",
+          detalhe: `${nome} (${email}) criado com perfil ${role}`,
+          usuario: meuNome
+        }]);
+
+        alerta(`✅ Usuário ${nome} criado com sucesso!`);
+        document.getElementById("novo-nome").value  = "";
+        document.getElementById("novo-email").value = "";
+        document.getElementById("novo-senha").value = "";
+        document.getElementById("novo-role").value  = "usuario";
+        carregarUsuarios();
+
+      } catch (e) {
+        alerta(`❌ ${e.message}`, true);
+      } finally {
+        btn.disabled = false; btn.textContent = "Criar Usuário";
+      }
+    });
+
+    // ── Carregar lista de usuários ──────────────────────────
+    async function carregarUsuarios() {
+      const { data: users, error } = await sb.from("perfis").select("*").order("nome");
+      if (error) return alerta("Erro ao carregar usuários.", true);
+
+      const w = document.getElementById("usuarios-wrapper");
+      if (!users || users.length === 0) {
+        w.innerHTML = '<p style="padding:20px;color:var(--texto-dim);">Nenhum usuário encontrado.</p>';
+        return;
+      }
+
+      const roleBadge = r => {
+        const cls = r === "admin_master" ? "tag-Massiva"
+                  : r === "admin"        ? "tag-pendencia"
+                  :                        "tag-normal";
+        return `<span class="tag-badge ${cls}">${escapeHtml(r)}</span>`;
+      };
+
+      w.innerHTML = `
+        <table class="tickets-table" style="width:100%;">
+          <thead><tr>
+            <th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th>
+            <th style="width:160px;text-align:center;">Ação</th>
+          </tr></thead>
+          <tbody>
+            ${users.map(u => {
+              const ehEuMesmo   = u.id === meuId;
+              const podeAlterar = !ehEuMesmo && (
+                (meuRole === "admin_master" && u.role !== "admin_master") ||
+                (meuRole === "admin" && (u.role === "usuario" || u.role === "admin"))
+              );
+
+              return `<tr>
+                <td><strong>${escapeHtml(u.nome || "—")}</strong></td>
+                <td style="font-size:0.85rem;color:var(--texto-dim);">${escapeHtml(u.email || "—")}</td>
+                <td>${roleBadge(u.role)}</td>
+                <td>${u.ativo ? "✅ Ativo" : "❌ Bloqueado"}</td>
+                <td style="display:flex;gap:8px;justify-content:center;">
+                  <button class="btn-edit-desc ${podeAlterar ? "" : "btn-disabled"}"
+                    ${podeAlterar ? `onclick="alternarStatus('${u.id}', ${u.ativo}, '${escapeJs(u.nome || "")}')"` : "disabled"}>
+                    ${u.ativo ? "Bloquear" : "Ativar"}
+                  </button>
+                  <button class="btn-delete ${podeAlterar ? "" : "btn-disabled"}"
+                    id="btn-del-${u.id}"
+                    ${podeAlterar ? `onclick="removerUsuario('${u.id}', '${escapeJs(u.nome || "")}')"` : "disabled"}
+                    style="font-size:1.1rem;padding:2px 8px;">🗑</button>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    // ── Remover usuário ─────────────────────────────────────
+    async function removerUsuario(id, nome) {
+      if (!confirm(`TEM CERTEZA? Isso excluirá o acesso de "${nome}" permanentemente.`)) return;
+      
+      const btnDel = document.getElementById(`btn-del-${id}`);
+      if (btnDel) {
+        btnDel.disabled = true;
+        btnDel.textContent = '⏳';
+      }
+
+      try {
+        const session = await getSession();
+        if (!session?.access_token) throw new Error("Sessão inválida.");
+
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/delete-user`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+            "apikey": SUPABASE_KEY
+          },
+          body: JSON.stringify({ target_user_id: id })
+        });
+
+        const payload = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(payload?.error || "Erro ao remover usuário.");
+
+        alerta("🗑️ Usuário removido com sucesso!");
+        carregarUsuarios();
+      } catch (err) {
+        alerta(`❌ ${err.message}`, true);
+        if (btnDel) {
+          btnDel.disabled = false;
+          btnDel.textContent = '🗑';
+        }
+      }
+    }
+
+    // ── Bloquear / Ativar ───────────────────────────────────
+    async function alternarStatus(id, statusAtual, nomeAlvo) {
+      const novoStatus = !statusAtual;
+      const { error } = await sb.from("perfis").update({ ativo: novoStatus }).eq("id", id);
+      if (error) return alerta("Erro ao atualizar.", true);
+
+      const meuNome = sessionStorage.getItem("fb_nome") || "sistema";
+      await sb.from("logs").insert([{
+        acao: "GESTAO", ttk: "USUARIO",
+        detalhe: `${nomeAlvo} foi ${novoStatus ? "Ativado" : "Bloqueado"}`,
+        usuario: meuNome
+      }]);
+
+      alerta("✅ Usuário atualizado!");
+      carregarUsuarios();
+    }
+
+    // ── Carregar logs ───────────────────────────────────────
+    async function carregarLogs() {
+      const { data: logs, error } = await sb.from("logs")
+        .select("*").eq("acao", "GESTAO")
+        .order("criado_em", { ascending: false }).limit(100);
+
+      const w = document.getElementById("log-wrapper");
+      if (error || !logs || logs.length === 0) {
+        w.innerHTML = '<p style="padding:20px;color:var(--texto-dim);">Nenhum log de gestão recente.</p>';
+        return;
+      }
+
+      w.innerHTML = `
+        <table class="tickets-table" style="width:100%;">
+          <thead><tr><th>Administrador</th><th>Detalhe</th><th>Horário</th></tr></thead>
+          <tbody>
+            ${logs.map(l => `
+              <tr>
+                <td><strong>${escapeHtml(l.usuario || "—")}</strong></td>
+                <td>${escapeHtml(l.detalhe || "—")}</td>
+                <td style="font-size:0.8rem;color:var(--texto-dim);">${new Date(l.criado_em).toLocaleString("pt-BR")}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    // ── Utilitários ─────────────────────────────────────────
+    function alerta(m, e = false) {
+      const a = document.getElementById("alerta");
+      if (!a) return;
+      a.textContent = m;
+      a.className = "alerta" + (e ? " erro" : "");
+      a.classList.remove("hidden");
+      setTimeout(() => a.classList.add("hidden"), 4000);
+    }
+    function escapeHtml(v) {
+      return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+    }
+    function escapeJs(v) {
+      return String(v).replaceAll("\\","\\\\").replaceAll("'","\\'").replaceAll('"','\\"');
+    }
+  </script>
+</body>
+</html>

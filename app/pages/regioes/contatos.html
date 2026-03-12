@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contatos</title>
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <style>
+    /* ── Layout geral ── */
+    .contatos-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .contatos-layout { grid-template-columns: 1fr; } }
+
+    /* ── Painéis ── */
+    .contatos-panel {
+      background: var(--bg2);
+      border: 1px solid var(--borda);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .contatos-panel-header {
+      background: var(--bg3);
+      padding: 12px 18px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--texto);
+      border-bottom: 1px solid var(--borda);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── Tabela de contatos ── */
+    .contatos-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .contatos-table th {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--texto-dim);
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--borda);
+      text-align: left;
+      background: var(--bg2);
+    }
+    .contatos-table td {
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 0.88rem;
+      color: var(--texto);
+    }
+    .contatos-table tr:last-child td { border-bottom: none; }
+    .contatos-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ── Edição inline ── */
+    .contatos-table td input {
+      background: var(--bg);
+      border: 1px solid var(--azul);
+      color: var(--texto);
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+    .btn-row-acoes {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .btn-editar-contato {
+      background: none;
+      border: 1px solid var(--borda-clara);
+      color: var(--azul);
+      border-radius: 4px;
+      padding: 2px 9px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-editar-contato:hover { background: var(--azul-glow); }
+    .btn-salvar-contato {
+      background: var(--azul);
+      border: none;
+      color: white;
+      border-radius: 4px;
+      padding: 2px 9px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-salvar-contato:hover { opacity: 0.85; }
+    .btn-cancelar-contato {
+      background: none;
+      border: 1px solid rgba(180,180,180,0.25);
+      color: var(--texto-dim);
+      border-radius: 4px;
+      padding: 2px 9px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-excluir-contato {
+      background: none;
+      border: 1px solid rgba(231,76,60,0.4);
+      color: #e74c3c;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-excluir-contato:hover { background: rgba(231,76,60,0.1); }
+
+    /* ── Adicionar novo ── */
+    .add-contato-row {
+      display: flex;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--borda);
+      background: var(--bg2);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .add-contato-row input {
+      flex: 1;
+      min-width: 100px;
+      background: var(--bg);
+      border: 1px solid var(--borda);
+      color: var(--texto);
+      padding: 5px 9px;
+      border-radius: 5px;
+      font-size: 0.83rem;
+    }
+    .add-contato-row input:focus { border-color: var(--azul); outline: none; }
+
+    /* ── Escalation ── */
+    .esc-region {
+      margin-bottom: 20px;
+    }
+    .esc-region:last-child { margin-bottom: 0; }
+    .esc-titulo {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--borda);
+      color: var(--texto-dim);
+    }
+    .esc-titulo.sul    { color: #3498db; border-color: rgba(52,152,219,0.3); }
+    .esc-titulo.norte  { color: #2ecc71; border-color: rgba(46,204,113,0.3); }
+    .esc-titulo.serra  { color: #f39c12; border-color: rgba(243,156,18,0.3); }
+    .esc-titulo.taquari { color: #9b59b6; border-color: rgba(155,89,182,0.3); }
+
+    .esc-plantao-row td {
+      color: var(--texto-dim);
+      font-style: italic;
+      font-size: 0.8rem;
+    }
+  </style>
+  <script src="../../assets/js/temas.js"></script>
+</head>
+<body>
+  <header>
+    <h1>🔗 CENTRAL OPERACIONAL</h1>
+    <nav>
+      <a href="../formulario/formulario.html" class="nav-btn">INSERIR TTK</a>
+      <a href="../painel/painel.html" class="nav-btn">PAINEL</a>
+      <a href="../encerrados/encerrados.html" class="nav-btn">ENCERRADOS</a>
+      <a href="../regioes/contatos.html" class="nav-btn">CONTATOS</a>
+      <a href="../gestao/gestao.html" class="nav-btn" id="nav-gestao">GESTÃO</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="usuario-nome" style="font-size:0.8rem;color:var(--texto-usuario);"></span>
+      <button onclick="logout()" class="btn-secondary" style="padding:5px 12px;font-size:0.8rem;">Sair</button>
+    </div>
+  </header>
+
+  <main class="container-wide">
+    <div class="contatos-layout">
+
+      <!-- COLUNA ESQUERDA: Contatos -->
+      <div class="contatos-panel">
+        <div class="contatos-panel-header">
+          📋 Contatos da Equipe
+          <span id="contatos-hint" style="font-size:0.72rem;font-weight:400;color:var(--texto-dim);"></span>
+        </div>
+        <table class="contatos-table" id="tabela-contatos">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th id="th-acoes" style="display:none;width:110px;"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-contatos">
+            <tr><td colspan="3" style="padding:20px;color:var(--texto-dim);text-align:center;">Carregando...</td></tr>
+          </tbody>
+        </table>
+        <!-- Linha de adicionar (visível só para admin/master) -->
+        <div class="add-contato-row hidden" id="add-contato-row">
+          <input type="text" id="add-nome" placeholder="Nome" maxlength="80">
+          <input type="tel" id="add-telefone" placeholder="(54) 99999-9999" maxlength="20">
+          <button class="btn-salvar-contato" onclick="adicionarContato()">+ Adicionar</button>
+        </div>
+      </div>
+
+      <!-- COLUNA DIREITA: Escalation -->
+      <div class="contatos-panel">
+        <div class="contatos-panel-header">
+          🚨 Escalation por Região
+        </div>
+        <div id="escalation-wrapper" style="padding:4px 0;">
+          <div style="padding:20px;color:var(--texto-dim);text-align:center;">Carregando...</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div id="alerta" class="alerta hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../../assets/js/supabase-config.js"></script>
+  <script src="../../assets/js/auth.js"></script>
+  <script>
+    const sb = getClient();
+    let podeEditar = false;
+    let contatosCache = [];
+
+    // ── Dados de Escalation (fixos conforme print) ──────────
+    // Estes dados são fixos no código. Se precisar torná-los editáveis
+    // no futuro, basta migrar para uma tabela no banco.
+    const ESCALATION = {
+      SUL: [
+        { nome: 'Delocir',   ddd: '53', tel: '999694917' },
+        { nome: 'Leonardo',  ddd: '55', tel: '999892154' },
+        { nome: 'Romulo',    ddd: '55', tel: '999414282' },
+        { nome: 'Jeferson',  ddd: '54', tel: '984292120' },
+      ],
+      NORTE: [
+        { nome: 'Leonardo',  ddd: '55', tel: '999892154' },
+        { nome: 'Romulo',    ddd: '55', tel: '999414282' },
+        { nome: 'Jeferson',  ddd: '54', tel: '984292120' },
+      ],
+      SERRA: [
+        { nome: 'Leonardo',  ddd: '55', tel: '999892154' },
+        { nome: 'Romulo',    ddd: '55', tel: '999414282' },
+        { nome: 'Jeferson',  ddd: '54', tel: '984292120' },
+      ],
+      TAQUARI: [
+        { nome: 'Leonardo',  ddd: '55', tel: '999892154' },
+        { nome: 'Romulo',    ddd: '55', tel: '999414282' },
+        { nome: 'Jeferson',  ddd: '54', tel: '984292120' },
+      ],
+    };
+
+    // ── Init ─────────────────────────────────────────────────
+    guardPage(["admin_master", "admin", "usuario"]).then(ctx => {
+      if (!ctx) return;
+
+      const role = ctx.perfil.role;
+      podeEditar = (role === 'admin_master' || role === 'admin');
+
+      // RBAC: Oculta Gestão para usuario
+      if (role === 'usuario') {
+        const btn = document.getElementById('nav-gestao');
+        if (btn) btn.style.display = 'none';
+      }
+
+      if (podeEditar) {
+        document.getElementById('th-acoes').style.display = '';
+        document.getElementById('add-contato-row').classList.remove('hidden');
+        document.getElementById('contatos-hint').textContent = 'Clique em Editar para alterar';
+      }
+
+      carregarContatos();
+      renderEscalation();
+    });
+
+    // ── Carregar contatos do banco ───────────────────────────
+    async function carregarContatos() {
+      const { data, error } = await sb
+        .from('escalonamento')
+        .select('*')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        document.getElementById('tbody-contatos').innerHTML =
+          `<tr><td colspan="3" style="padding:20px;color:#e74c3c;">Erro ao carregar contatos.</td></tr>`;
+        return;
+      }
+
+      contatosCache = data || [];
+      renderContatos();
+    }
+
+    // ── Renderizar lista de contatos ─────────────────────────
+    function renderContatos() {
+      const tbody = document.getElementById('tbody-contatos');
+
+      if (!contatosCache.length) {
+        tbody.innerHTML = `<tr><td colspan="3" style="padding:20px;color:var(--texto-dim);text-align:center;">Nenhum contato cadastrado.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = contatosCache.map(c => `
+        <tr id="row-${c.id}">
+          <td id="cell-nome-${c.id}">${escapeHtml(c.nome || '—')}</td>
+          <td id="cell-tel-${c.id}">${formatarTel(c.ddd, c.celular)}</td>
+          ${podeEditar ? `
+          <td>
+            <div class="btn-row-acoes">
+              <button class="btn-editar-contato" onclick="iniciarEdicao(${c.id})">Editar</button>
+              <button class="btn-excluir-contato" onclick="excluirContato(${c.id}, '${escapeJs(c.nome)}')">🗑</button>
+            </div>
+          </td>` : '<td></td>'}
+        </tr>
+      `).join('');
+    }
+
+    function formatarTel(ddd, cel) {
+      if (!ddd && !cel) return '—';
+      return `(${ddd || ''}) ${cel || ''}`.trim();
+    }
+
+    // ── Edição inline ────────────────────────────────────────
+    function iniciarEdicao(id) {
+      const c = contatosCache.find(x => x.id === id);
+      if (!c) return;
+
+      document.getElementById(`cell-nome-${id}`).innerHTML =
+        `<input type="text" id="edit-nome-${id}" value="${escapeHtml(c.nome || '')}" maxlength="80">`;
+
+      const telAtual = c.celular || '';
+      const dddAtual = c.ddd || '';
+      document.getElementById(`cell-tel-${id}`).innerHTML =
+        `<input type="tel" id="edit-tel-${id}" value="${escapeHtml('(' + dddAtual + ') ' + telAtual)}" placeholder="(54) 99999-9999" maxlength="20">`;
+
+      const row = document.getElementById(`row-${id}`);
+      const tdAcoes = row.querySelector('td:last-child');
+      tdAcoes.innerHTML = `
+        <div class="btn-row-acoes">
+          <button class="btn-salvar-contato" onclick="salvarEdicao(${id})">Salvar</button>
+          <button class="btn-cancelar-contato" onclick="cancelarEdicao(${id})">✕</button>
+        </div>`;
+
+      document.getElementById(`edit-nome-${id}`).focus();
+    }
+
+    function cancelarEdicao(id) {
+      renderContatos();
+    }
+
+    async function salvarEdicao(id) {
+      const nomeVal = document.getElementById(`edit-nome-${id}`)?.value.trim();
+      const telVal  = document.getElementById(`edit-tel-${id}`)?.value.trim();
+
+      if (!nomeVal) return mostrarAlerta('O nome não pode estar vazio.', true);
+
+      // Extrai DDD e número do campo de telefone
+      const { ddd, cel } = parseTelefone(telVal);
+
+      const { error } = await sb.from('escalonamento')
+        .update({ nome: nomeVal, ddd: ddd, celular: cel })
+        .eq('id', id);
+
+      if (error) return mostrarAlerta('Erro ao salvar contato.', true);
+
+      // Atualiza cache
+      const idx = contatosCache.findIndex(x => x.id === id);
+      if (idx >= 0) contatosCache[idx] = { ...contatosCache[idx], nome: nomeVal, ddd, celular: cel };
+
+      renderContatos();
+      mostrarAlerta('✅ Contato atualizado!');
+    }
+
+    // ── Adicionar contato ────────────────────────────────────
+    async function adicionarContato() {
+      const nomeVal = document.getElementById('add-nome').value.trim();
+      const telVal  = document.getElementById('add-telefone').value.trim();
+
+      if (!nomeVal) return mostrarAlerta('Informe o nome.', true);
+
+      const { ddd, cel } = parseTelefone(telVal);
+
+      const { data, error } = await sb.from('escalonamento')
+        .insert([{ nome: nomeVal, ddd: ddd, celular: cel }])
+        .select()
+        .single();
+
+      if (error) return mostrarAlerta('Erro ao adicionar contato.', true);
+
+      contatosCache.push(data);
+      contatosCache.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      renderContatos();
+
+      document.getElementById('add-nome').value = '';
+      document.getElementById('add-telefone').value = '';
+      mostrarAlerta('✅ Contato adicionado!');
+    }
+
+    // ── Excluir contato ──────────────────────────────────────
+    async function excluirContato(id, nome) {
+      if (!confirm(`Remover "${nome}" dos contatos?`)) return;
+
+      const { error } = await sb.from('escalonamento').delete().eq('id', id);
+      if (error) return mostrarAlerta('Erro ao excluir contato.', true);
+
+      contatosCache = contatosCache.filter(x => x.id !== id);
+      renderContatos();
+      mostrarAlerta('🗑️ Contato removido.');
+    }
+
+    // ── Renderizar Escalation (fixo) ─────────────────────────
+    function renderEscalation() {
+      const wrapper = document.getElementById('escalation-wrapper');
+      const regioes = ['SUL', 'NORTE', 'SERRA', 'TAQUARI'];
+
+      wrapper.innerHTML = regioes.map(reg => {
+        const contatos = ESCALATION[reg] || [];
+        const cls = reg.toLowerCase();
+        const linhas = contatos.map(p => `
+          <tr>
+            <td>${escapeHtml(p.nome)}</td>
+            <td>(${p.ddd}) ${p.tel}</td>
+          </tr>`).join('');
+
+        return `
+          <div class="esc-region">
+            <div class="esc-titulo ${cls}">Escalation ${reg}</div>
+            <table class="contatos-table">
+              <tbody>
+                <tr class="esc-plantao-row">
+                  <td colspan="2">Equipe plantão — Ver escala se existir</td>
+                </tr>
+                ${linhas}
+              </tbody>
+            </table>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Helpers ──────────────────────────────────────────────
+    function parseTelefone(val) {
+      // Aceita "(54) 99999-9999", "54 999999999", "99999999" etc.
+      const digits = val.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        return { ddd: digits.slice(0, 2), cel: digits.slice(2) };
+      }
+      return { ddd: '', cel: digits };
+    }
+
+    function mostrarAlerta(msg, erro = false) {
+      const el = document.getElementById('alerta');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'alerta' + (erro ? ' erro' : '');
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    function escapeHtml(v) {
+      return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
+    }
+    function escapeJs(v) {
+      return String(v).replaceAll('\\','\\\\').replaceAll("'","\\'").replaceAll('"','\\"');
+    }
+  </script>
+</body>
+</html>

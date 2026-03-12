@@ -1,0 +1,81 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+
+import { corsHeaders } from "../_shared/cors.ts"
+
+serve(async (req: Request) => {
+  // Tratamento do Preflight Request (CORS)
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    // 2. Extração de Payload e Fail-Fast Validation (Clean Code)
+    const { target_user_id } = await req.json()
+    if (!target_user_id) {
+      throw new Error("O ID do usuário alvo é obrigatório.")
+    }
+
+    // 3. Inicialização do Supabase Admin Client (Service Role)
+    // Usamos a Service Key para ter privilégios de exclusão no Auth, bypassando o RLS.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // 4. Autenticação e Identificação do Chamador (Security / OWASP)
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error("Token de autenticação não fornecido.")
+    
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user: callerUser }, error: verifyError } = await supabaseAdmin.auth.getUser(token)
+    
+    if (verifyError || !callerUser) {
+      throw new Error("Acesso não autorizado ou token inválido.")
+    }
+
+    // 5. Otimização de Performance: Busca paralela dos perfis (Chamador e Alvo)
+    const [callerRes, targetRes] = await Promise.all([
+      supabaseAdmin.from('perfis').select('nome, role').eq('id', callerUser.id).single(),
+      supabaseAdmin.from('perfis').select('nome, role').eq('id', target_user_id).single()
+    ])
+
+    if (callerRes.error || !callerRes.data) throw new Error("Perfil do chamador não encontrado.")
+    if (targetRes.error || !targetRes.data) throw new Error("Perfil alvo não encontrado.")
+
+    const callerProfile = callerRes.data
+    const targetProfile = targetRes.data
+
+    // 6. Motor de Autorização (Regras de Hierarquia)
+    if (callerProfile.role === 'usuario') {
+      throw new Error("Usuários comuns não têm permissão para excluir contas.")
+    }
+    if (callerProfile.role === 'admin' && (targetProfile.role === 'admin' || targetProfile.role === 'admin_master')) {
+      throw new Error("Admins não podem excluir outros admins ou admin masters.")
+    }
+
+    // 7. Deleção do Usuário no Auth
+    // Se a tabela 'perfis' estiver configurada com ON DELETE CASCADE, deletar no Auth limpa a tabela automaticamente.
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(target_user_id)
+    if (deleteError) throw deleteError
+
+    // 8. Trilha de Auditoria (Logs)
+    await supabaseAdmin.from('logs').insert({
+      acao: 'EXCLUSAO_USUARIO',
+      ttk: null,
+      detalhe: `Usuário ${targetProfile.nome} (${targetProfile.role}) foi excluído do sistema.`,
+      usuario: callerProfile.nome
+    })
+
+    return new Response(JSON.stringify({ success: true, message: "Usuário excluído com sucesso." }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
+
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400, // Bad Request
+    })
+  }
+})

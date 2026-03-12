@@ -1,0 +1,44 @@
+# ==========================================================
+# GERAL
+# ==========================================================
+.DS_Store
+Thumbs.db
+
+# ==========================================================
+# PACOTES E DEPENDÊNCIAS
+# ==========================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==========================================================
+# ARQUIVOS DE AMBIENTE E SEGREDOS
+# ==========================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.cert
+
+# ==========================================================
+# IDE E EDITORES
+# ==========================================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ==========================================================
+# SUPABASE
+# ==========================================================
+# Se você usar o CLI localmente e tiver um docker rodando
+supabase/.temp/
+supabase/.branches/

@@ -1,0 +1,168 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+
+import { corsHeaders } from "../_shared/cors.ts"
+
+const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')
+if (!BOT_TOKEN) console.error('[CRITICAL] TELEGRAM_BOT_TOKEN não configurado nos Secrets.')
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+async function validarJWT(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return false
+
+  const token = authHeader.replace('Bearer ', '')
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+  )
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  return !error && !!user
+}
+
+function erroResp(msg: string, status = 400) {
+  return new Response(JSON.stringify({ error: msg }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+  })
+}
+
+function okResp(msg: string) {
+  return new Response(JSON.stringify({ success: true, message: msg }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200,
+  })
+}
+
+// ── Envio de texto ─────────────────────────────────────────────────────────
+
+async function enviarTexto(chatId: string, mensagem: string): Promise<void> {
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: mensagem, parse_mode: 'HTML' }),
+  })
+  if (!res.ok) {
+    const e = await res.json()
+    throw new Error(`Telegram sendMessage: ${e.description}`)
+  }
+}
+
+// ── Envio de fotos ─────────────────────────────────────────────────────────
+// Usa sendPhoto para 1 foto, sendMediaGroup para 2.
+// A legenda (caption) vai na primeira foto.
+
+async function enviarFotos(chatId: string, fotos: Uint8Array[], nomes: string[], caption: string): Promise<void> {
+  if (fotos.length === 0) return
+
+  if (fotos.length === 1) {
+    // ── 1 foto ──────────────────────────────────────────────
+    const fd = new FormData()
+    fd.append('chat_id', chatId)
+    fd.append('caption', caption.slice(0, 1024))   // limite Telegram
+    fd.append('parse_mode', 'HTML')
+    fd.append('photo', new Blob([fotos[0]], { type: 'image/jpeg' }), nomes[0] || 'foto.jpg')
+
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: 'POST',
+      body: fd,
+    })
+    if (!res.ok) {
+      const e = await res.json()
+      throw new Error(`Telegram sendPhoto: ${e.description}`)
+    }
+    return
+  }
+
+  // ── 2 fotos — sendMediaGroup ────────────────────────────
+  const fd = new FormData()
+  fd.append('chat_id', chatId)
+
+  const media = fotos.map((_, idx) => ({
+    type: 'photo',
+    media: `attach://foto${idx}`,
+    ...(idx === 0 ? { caption: caption.slice(0, 1024), parse_mode: 'HTML' } : {}),
+  }))
+
+  fd.append('media', JSON.stringify(media))
+  fotos.forEach((bytes, idx) => {
+    fd.append(`foto${idx}`, new Blob([bytes], { type: 'image/jpeg' }), nomes[idx] || `foto${idx}.jpg`)
+  })
+
+  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup`, {
+    method: 'POST',
+    body: fd,
+  })
+  if (!res.ok) {
+    const e = await res.json()
+    throw new Error(`Telegram sendMediaGroup: ${e.description}`)
+  }
+}
+
+// ── Handler principal ──────────────────────────────────────────────────────
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  try {
+    if (!BOT_TOKEN) throw new Error("Configuração do servidor incompleta: TELEGRAM_BOT_TOKEN ausente.")
+
+    // Validar JWT antes de qualquer coisa
+    const autorizado = await validarJWT(req)
+    if (!autorizado) return erroResp("Acesso não autorizado.", 401)
+
+    const contentType = req.headers.get('content-type') ?? ''
+    let mensagem = ''
+    let regiao   = ''
+    const fotoBytes: Uint8Array[] = []
+    const fotoNomes: string[] = []
+
+    if (contentType.includes('multipart/form-data')) {
+      // ── Payload com fotos (FormData) ────────────────────
+      const form = await req.formData()
+      mensagem = (form.get('mensagem') as string) ?? ''
+      regiao   = (form.get('regiao')   as string) ?? ''
+
+      // Coleta até 2 fotos (campos foto0, foto1)
+      for (let i = 0; i < 2; i++) {
+        const entry = form.get(`foto${i}`)
+        if (entry && entry instanceof File) {
+          const buf = await entry.arrayBuffer()
+          fotoBytes.push(new Uint8Array(buf))
+          fotoNomes.push(entry.name || `foto${i}.jpg`)
+        }
+      }
+    } else {
+      // ── Payload JSON (sem fotos) ─────────────────────────
+      const body = await req.json()
+      mensagem = body.mensagem ?? ''
+      regiao   = body.regiao   ?? ''
+    }
+
+    if (!mensagem || !regiao) {
+      return erroResp("Os campos 'mensagem' e 'regiao' são obrigatórios.")
+    }
+
+    const envVarName = `TELEGRAM_GROUP_${regiao.toUpperCase()}`
+    const chatId = Deno.env.get(envVarName)
+    
+    if (!chatId) {
+      return erroResp(`Região inválida ou grupo não configurado no Supabase Secrets (${envVarName}).`)
+    }
+
+    if (fotoBytes.length > 0) {
+      // Envia texto primeiro (para aparecer antes das fotos no grupo)
+      await enviarFotos(chatId, fotoBytes, fotoNomes, mensagem)
+    } else {
+      await enviarTexto(chatId, mensagem)
+    }
+
+    return okResp("Mensagem enviada ao Telegram.")
+
+  } catch (err) {
+    console.error('[enviar-telegram] Erro:', err.message)
+    return erroResp(err.message)
+  }
+})

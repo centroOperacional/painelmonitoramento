@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Monitoramento</title>
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <script>window.FB_TEMA_SEM_BOTAO = true;</script>
+  <script src="../../assets/js/temas.js"></script>
+</head>
+<body>
+  <header>
+    <h1>🔗 CENTRAL OPERACIONAL</h1>
+      <nav>
+        <a href="../formulario/formulario.html" class="nav-btn">INSERIR TTK</a>
+        <a href="../painel/painel.html" class="nav-btn active">PAINEL</a>
+        <a href="../encerrados/encerrados.html" class="nav-btn">ENCERRADOS</a>
+        <a href="../gestao/gestao.html" class="nav-btn" id="nav-gestao">GESTÃO</a>
+      </nav>
+      
+      <div style="display:flex;align-items:center;gap:10px;">
+      <span id="usuario-nome" style="font-size:0.8rem;color:var(--texto-usuario);"></span>
+      <button onclick="abrirModalSenha()" class="btn-secondary" style="padding:5px 12px;font-size:0.8rem;">Alterar Senha</button>
+      <button onclick="logout()" class="btn-secondary" style="padding:5px 12px;font-size:0.8rem;" id="btn-logout">Sair</button>
+    </div>
+  </header>
+
+  <main class="container-wide">
+    <div class="painel-header">
+      <div class="contadores">
+        <div class="contador-item">
+          <span class="contador-valor" id="cnt-total">0</span>
+          <span class="contador-label">Total TTKs</span>
+        </div>
+        <div class="contador-sep"></div>
+        <div class="contador-item">
+          <span class="contador-valor massiva" id="cnt-massiva">0</span>
+          <span class="contador-label">Massiva</span>
+        </div>
+        <div class="contador-sep"></div>
+        <div class="contador-item">
+          <span class="contador-valor pendencia" id="cnt-pendencia">0</span>
+          <span class="contador-label">Pendência Téc.</span>
+        </div>
+        <div class="contador-sep"></div>
+        <div class="contador-item">
+          <span class="contador-valor crise" id="cnt-crise">0</span>
+          <span class="contador-label">Sala de Crise</span>
+        </div>
+      </div>
+
+      <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;">
+        <a href="https://sigo.fibrasil.com.br/" target="_blank" rel="noopener" title="SIGO" style="
+          display:flex;flex-direction:column;align-items:center;gap:3px;
+          text-decoration:none;padding:5px 10px;border-radius:8px;
+          border:1px solid var(--borda);background:var(--bg2);
+          transition:all 0.2s;color:var(--texto-dim);font-size:0.6rem;
+          font-weight:700;letter-spacing:0.06em;text-transform:uppercase;"
+          onmouseover="this.style.borderColor='var(--azul-borda)';this.style.background='var(--bg3)'"
+          onmouseout="this.style.borderColor='var(--borda)';this.style.background='var(--bg2)'">
+          <img src="../../assets/img/sigo.png" style="width:28px;height:28px;border-radius:6px;object-fit:cover;">
+          SIGO
+        </a>
+        <a href="https://naf.fibrasil.com.br/naf/login" target="_blank" rel="noopener" title="NAF" style="
+          display:flex;flex-direction:column;align-items:center;gap:3px;
+          text-decoration:none;padding:5px 10px;border-radius:8px;
+          border:1px solid var(--borda);background:var(--bg2);
+          transition:all 0.2s;color:var(--texto-dim);font-size:0.6rem;
+          font-weight:700;letter-spacing:0.06em;text-transform:uppercase;"
+          onmouseover="this.style.borderColor='var(--azul-borda)';this.style.background='var(--bg3)'"
+          onmouseout="this.style.borderColor='var(--borda)';this.style.background='var(--bg2)'">
+          <img src="../../assets/img/02-naf.png" style="width:28px;height:28px;border-radius:6px;object-fit:cover;">
+          NAF
+        </a>
+        <a href="https://am.fibrasil.com.br/alarmmgr/portal" target="_blank" rel="noopener" title="Alarm Manager" style="
+          display:flex;flex-direction:column;align-items:center;gap:3px;
+          text-decoration:none;padding:5px 10px;border-radius:8px;
+          border:1px solid var(--borda);background:var(--bg2);
+          transition:all 0.2s;color:var(--texto-dim);font-size:0.6rem;
+          font-weight:700;letter-spacing:0.06em;text-transform:uppercase;"
+          onmouseover="this.style.borderColor='var(--azul-borda)';this.style.background='var(--bg3)'"
+          onmouseout="this.style.borderColor='var(--borda)';this.style.background='var(--bg2)'">
+          <img src="../../assets/img/03-alm.png" style="width:28px;height:28px;border-radius:6px;object-fit:cover;">
+          ALM
+        </a>
+      </div>
+
+      <div class="painel-acoes">
+        <span id="realtime-badge" style="font-size:0.75rem;color:#2ecc71;opacity:0.8;">● ao vivo</span>
+        <span id="ultima-atualizacao" class="info-text"></span>
+      </div>
+    </div>
+
+    <div id="tabela-wrapper"><div class="loading">Carregando tickets...</div></div>
+  </main>
+
+  <div id="modal-regiao" class="modal hidden">
+    <div class="modal-content">
+      <h3>Editar Observações</h3>
+      <p class="modal-info">TTK: <strong id="modal-ttk"></strong></p>
+      <textarea id="modal-texto" rows="4" placeholder="Informe a situação atual..."></textarea>
+      <div class="modal-actions">
+        <button id="modal-salvar" class="btn-primary">Salvar</button>
+        <button id="modal-cancelar" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-solicitar" class="modal hidden">
+    <div class="modal-content" style="max-width:400px;">
+      <h3>📣 Solicitar Atualização</h3>
+      <p class="modal-info">TTK: <strong id="solicitar-ttk"></strong></p>
+      <p style="font-size:0.85rem;color:var(--texto-dim);margin-bottom:18px;">
+        Será enviada uma mensagem ao grupo do Telegram solicitando atualização deste ticket.
+      </p>
+      <div class="modal-actions">
+        <button id="solicitar-confirmar" class="btn-primary">Solicitar Atualização</button>
+        <button id="solicitar-cancelar" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-delete" class="modal hidden">
+    <div class="modal-content">
+      <h3>Remover Ticket</h3>
+      <p class="modal-info" style="margin-bottom:16px;">TTK: <strong id="delete-ttk"></strong></p>
+      <div class="delete-opcoes">
+        <button id="delete-finalizar" class="btn-finalizar">
+          Finalizado pela equipe<br><small>Salvar nos Encerrados</small>
+        </button>
+        <button id="delete-confirmar" class="btn-danger btn-deletar">
+          Deletar do Painel<br><small>Sem salvar histórico</small>
+        </button>
+      </div>
+      <div style="margin-top:14px;text-align:right;">
+        <button id="delete-cancelar" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-senha" class="modal hidden">
+    <div class="modal-content" style="max-width: 350px;">
+      <h3>Alterar Minha Senha</h3>
+      <div class="field">
+        <label>Nova Senha</label>
+        <input type="password" id="nova-senha-input" placeholder="Mínimo 6, máximo 20 caracteres">
+      </div>
+      <div class="modal-actions" style="margin-top:15px;">
+        <button onclick="confirmarTrocaSenha()" class="btn-primary">Confirmar</button>
+        <button onclick="fecharModalSenha()" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="alerta" class="alerta hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../../assets/js/supabase-config.js"></script>
+  <script src="../../assets/js/auth.js"></script>
+  <script src="../../assets/js/painel.js"></script>
+
+
+</body>
+</html>

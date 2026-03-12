@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TTKs ENCERRADOS</title>
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <script src="../../assets/js/temas.js"></script>
+</head>
+<body>
+  <header>
+    <h1>🔗 CENTRAL OPERACIONAL</h1>
+    <nav>
+      <a href="../formulario/formulario.html" class="nav-btn">INSERIR TTK</a>
+      <a href="../painel/painel.html" class="nav-btn">PAINEL</a>
+      <a href="../encerrados/encerrados.html" class="nav-btn active">ENCERRADOS</a>
+      <a href="../gestao/gestao.html" class="nav-btn" id="nav-gestao">GESTÃO</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="usuario-nome" style="font-size:0.8rem;color:var(--texto-usuario);"></span>
+      <button onclick="logout()" class="btn-secondary" style="padding:5px 12px;font-size:0.8rem;" id="btn-logout">Sair</button>
+    </div>
+  </header>
+
+  <main class="container-wide">
+    <div style="
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:20px;padding:60px 20px;text-align:center;">
+      <div style="font-size:2.5rem;">📊</div>
+      <h2 style="font-size:1.1rem;color:var(--texto);font-weight:600;margin:0;">TTKs ENCERRADOS</h2>
+      <p style="font-size:0.9rem;color:var(--texto-dim);max-width:460px;margin:0;line-height:1.6;">
+        Os TTKs finalizados são salvos automaticamente em uma planilha do Google Sheets,
+        organizados por região (SUL, NORTE, SERRA, TAQUARI).
+      </p>
+      <a
+        href="https://docs.google.com/spreadsheets/d/1Iap-MczsJ8NbrpvoFmIAJ_HwgF_CJkhmfJCgIYVnkSE/edit?usp=sharing"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn-primary"
+        style="text-decoration:none;padding:10px 24px;font-size:0.95rem;">
+        📄 PLANILHA DE ENCERRADOS
+      </a>
+    </div>
+  </main>
+
+  <div id="modal-senha" class="modal hidden">
+    <div class="modal-content" style="max-width:350px;">
+      <h3>Alterar Minha Senha</h3>
+      <div class="field">
+        <label>Nova Senha</label>
+        <input type="password" id="nova-senha-input" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="modal-actions" style="margin-top:15px;">
+        <button onclick="confirmarTrocaSenha()" class="btn-primary">Confirmar</button>
+        <button onclick="fecharModalSenha()" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="alerta" class="alerta hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../../assets/js/supabase-config.js"></script>
+  <script src="../../assets/js/auth.js"></script>
+  <script>
+    guardPage(["admin_master", "admin", "editor", "usuario"]).then(ctx => {
+      if (!ctx) return;
+      const role = ctx.perfil.role;
+      if (role === "usuario" || role === "editor") {
+        const btn = document.getElementById("nav-gestao");
+        if (btn) btn.style.display = "none";
+      }
+    });
+
+    function abrirModalSenha() {
+      document.getElementById("modal-senha").classList.remove("hidden");
+      document.getElementById("nova-senha-input").value = "";
+      document.getElementById("nova-senha-input").focus();
+    }
+
+    function fecharModalSenha() {
+      document.getElementById("modal-senha").classList.add("hidden");
+    }
+
+    async function confirmarTrocaSenha() {
+      const nova = document.getElementById("nova-senha-input").value;
+      try {
+        await atualizarMinhaSenha(nova);
+        fecharModalSenha();
+        const a = document.getElementById("alerta");
+        a.textContent = "✅ Senha alterada com sucesso!";
+        a.className = "alerta";
+        a.classList.remove("hidden");
+        setTimeout(() => a.classList.add("hidden"), 4000);
+      } catch (e) {
+        const a = document.getElementById("alerta");
+        a.textContent = "❌ " + e.message;
+        a.className = "alerta erro";
+        a.classList.remove("hidden");
+        setTimeout(() => a.classList.add("hidden"), 4000);
+      }
+    }
+  </script>
+</body>
+</html>
