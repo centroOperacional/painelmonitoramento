@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
 
     const { error: perfilInsertError } = await adminClient
       .from("perfis")
-      .insert([
+      .upsert([
         {
           id: newUserId,
           nome,
