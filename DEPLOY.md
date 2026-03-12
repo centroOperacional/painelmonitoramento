@@ -1,5 +1,14 @@
 # Guia de Deploy — TTKs Fibrasil V2
 
+## 0. Instalação Inicial do Banco (SQL)
+
+Antes de configurar o front-end ou as Edge Functions, execute os seguintes scripts no **SQL Editor** do Supabase:
+
+1.  **`supabase/setup.sql`**: Cria as tabelas base (`perfis`, `tickets`, `logs`) e ativa as políticas RLS.
+2.  **`supabase/telegram_config.sql`**: Cria a tabela de configuração do Telegram para permitir edição via interface.
+
+---
+
 ## Estrutura do Projeto
 
 ```
@@ -143,7 +152,7 @@ select cron.schedule(
 - [x] `delete-user` valida hierarquia no backend (usuario não pode deletar ninguém)
 - [x] Token do Telegram removido do código — usa apenas Secrets
 - [x] `guardPage()` chamado uma única vez por página
-- [x] RBAC: botão Gestão oculto para perfil `usuario` em todas as páginas
+- [x] RBAC: botão GESTÃO visível para todos, mas acesso restrito via `guardPage` (admins apenas)
 - [x] `escapeHtml()` e `escapeJs()` em dados renderizados na gestão
 - [x] `limparTexto()` (anti-XSS) em todos os campos de formulário
 - [x] Logout automático por inatividade (1 hora)
