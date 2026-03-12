@@ -37,16 +37,16 @@ async function getTelegramConfig(): Promise<{ botToken: string; groups: Record<s
 }
 
 async function validarJWT(req: Request): Promise<boolean> {
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) return false
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return false;
 
-  const token = authHeader.replace('Bearer ', '')
+  const token = authHeader.replace("Bearer ", "");
   const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  )
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  return !error && !!user
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  return !error && !!user;
 }
 
 function erroResp(msg: string, status = 400) {
